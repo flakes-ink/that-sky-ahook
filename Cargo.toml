@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-color-hook = { git = "https://git.colorsky.fun/Color/color-hook" }
+color-hook = { git = "https://github.com/flakes-ink/color-hook" }
 libc = "0.2"
 
 # Override release profile to not strip and to export init_hook
