@@ -1,0 +1,17 @@
+[package]
+name = "that-sky-ahook"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+color-hook = { git = "https://git.colorsky.fun/Color/color-hook" }
+libc = "0.2"
+
+# Override release profile to not strip and to export init_hook
+[profile.release]
+strip = "none"
+lto = true
+panic = "abort"
