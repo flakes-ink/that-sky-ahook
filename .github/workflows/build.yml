@@ -1,0 +1,30 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Nix with flake support.
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      # Free shared Nix cache — without this every run re-downloads
+      # nixpkgs and the ~1GB Android NDK from scratch.
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      - name: Build with nix
+        run: nix build .#default
+
+      - name: Upload .so artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libthat_sky_ahook
+          path: result/lib/libthat_sky_ahook.so
+          if-no-files-found: error
