@@ -1,6 +1,7 @@
 //! Hook `Game::UpdateSync`.
 //!
-//! On the first frame we capture the game's `lua_State*`; every frame
+//! On the first frame we capture the game's `lua_State*` and install the
+//! `sle` bindings on the game thread ([`super::bindings`]); every frame
 //! thereafter we drain the script queue and feed each pending script to
 //! `lua_debugdostring`.
 
@@ -34,12 +35,9 @@ extern "C" fn hook_game_update_sync(a1: *mut *mut u64) {
             if !lua_state.is_null() {
                 GAME_LUA_STATE.store(lua_state, Ordering::Release);
                 log_info!("game_update_sync: captured Lua state at {:p}", lua_state);
-                // First frame only: queue a Lua chunk that installs the
-                // `sle` bindings via the game's own LuaJIT FFI → our
-                // exported `sle_log`. No `lua_State*` access, so no
-                // Lua ABI coupling to mlua's vendored LuaJIT.
-                // TODO: Warning with lua C API.
-                // super::bindings::register();
+                // First frame only: install the `sle` bindings into the
+                // game VM. Runs on the game thread — see `bindings::register`.
+                unsafe { super::bindings::register() };
             }
         }
     }

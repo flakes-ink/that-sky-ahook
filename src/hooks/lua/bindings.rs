@@ -1,64 +1,94 @@
-//! Expose host-side logging to the game's Lua VM via LuaJIT FFI.
+//! Expose host-side logging to the game's Lua VM as `sle.log` / `sle.print`.
 //!
-//! Unlike registering a C cfunction through `mlua::ffi` (which requires
-//! mlua's vendored LuaJIT to share its `lua_State` layout with the
-//! game's embedded Lua VM — an ABI match we cannot guarantee and that
-//! froze the game on this device), this approach **never touches the
-//! `lua_State*`**.
+//! Port of the C++ mod's `sleAddLuaBindings` (`crates/that-sky-lua/src/bindings.c`):
+//! the `sle` namespace is installed into the game's own VM, and `sle.log`
+//! becomes a real C closure that forwards to [`crate::log_info!`] (logcat).
 //!
-//! Instead we declare a plain C entry point, [`sle_log`], export it
-//! from this `.so`, and queue a small Lua source chunk that uses the
-//! game's own LuaJIT FFI (`ffi.C.sle_log`) to call it. The game's
-//! LuaJIT resolves the symbol against the global symbol table; if the
-//! game's Lua is not LuaJIT (or our `.so` was loaded with
-//! `RTLD_LOCAL`), the `pcall` simply fails and `sle.log` stays unbound
-//! — the game keeps running, and the failure is visible in logcat as
-//! a Lua error rather than as a crash/freeze.
+//! Registration wraps the captured `lua_State*` with mlua via
+//! [`Lua::get_or_init_from_ptr`]. This is only sound because our mlua links
+//! the exact Lua 5.2.0 the game embeds (`flake.nix` builds it from the
+//! pristine lua-5.2.0 tarball), so the `lua_State` layout matches. The old
+//! approach used mlua's vendored LuaJIT and froze the game on an ABI
+//! mismatch; the LuaJIT-FFI fallback is gone because the game's Lua is not
+//! LuaJIT.
 
-use crate::log_info;
-use std::ffi::{CStr, c_char};
+use crate::{log_error, log_info};
 
 use super::update_sync;
 
-/// `sle_log(msg)` — host entry point callable from LuaJIT FFI.
+/// Install `_G.sle.log` / `_G.sle.print` into the game's Lua VM.
 ///
-/// Logs the Lua-supplied string to logcat under the host tag via
-/// [`log_info!`]. Exported with `#[unsafe(no_mangle)]` so `ffi.C` can
-/// resolve it by name.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn sle_log(msg: *const c_char) {
-    if msg.is_null() {
-        return;
+/// The wrapped state is **not owned** by mlua (`owned = false`), so the
+/// handle's `Drop` never calls `lua_close` — the game keeps its VM. The
+/// registered functions stay valid for the state's lifetime: mlua caches
+/// its instance in the VM registry and resolves it from there whenever the
+/// game later calls `sle.log` / `sle.print`.
+///
+/// # Safety
+///
+/// Must be called on the game's main thread with the VM idle (the
+/// [`update_sync`] capture frame satisfies this). Returns `true` on
+/// success.
+pub unsafe fn register() -> bool {
+    let state = update_sync::lua_state();
+    if state.is_null() {
+        log_error!("bindings: Lua state not captured yet");
+        return false;
     }
-    unsafe {
-        let s = CStr::from_ptr(msg).to_string_lossy();
-        log_info!("[sle] {}", s);
-    }
-}
 
-/// Queue the Lua source that installs `_G.sle.log` / `_G.sle.print`
-/// using LuaJIT FFI. The game runs the chunk through its own
-/// `lua_debugdostring` on the same frame.
-///
-/// Wrapped in `pcall(require, "ffi")`: if the game's Lua is not
-/// LuaJIT, `ffi` is unavailable and the bindings silently stay unset
-/// (no freeze). Check logcat for the Lua error in that case.
-pub fn register() {
-    let chunk = concat!(
-        // Probe for LuaJIT FFI without aborting the chunk on failure.
-        "local ok, ffi = pcall(require, \"ffi\") ",
-        "if not ok or not ffi then return end ",
-        // Declare our host entry point.
-        "ffi.cdef[[ void sle_log(const char *msg); ]] ",
-        // Install the `sle` namespace.
-        "_G.sle = _G.sle or {} ",
-        "_G.sle.log = _G.sle.log or function(msg) ",
-        "  ffi.C.sle_log(tostring(msg)) ",
-        "end ",
-        // `sle.print` joins args with a tab and forwards to `sle.log`.
-        "_G.sle.print = _G.sle.print or function(...) ",
-        "  _G.sle.log(table.concat({...}, \"\\t\")) ",
-        "end",
-    );
-    update_sync::push_script(chunk);
+    // SAFETY: the game keeps the VM alive for the whole process, and the
+    // caller runs on the game thread with no other code touching the VM.
+    let lua = unsafe { mlua::Lua::get_or_init_from_ptr(state.cast::<mlua::lua_State>()) };
+
+    let result = (|| -> mlua::Result<()> {
+        let globals = lua.globals();
+
+        // `sle` namespace — create the table if missing, like `bindings.c`.
+        if globals.get::<mlua::Value>("sle")?.is_nil() {
+            globals.set("sle", lua.create_table()?)?;
+        }
+        let sle: mlua::Table = globals.get("sle")?;
+
+        // `sle.log(msg)` → host-side logcat via `log_info!`.
+        let log_fn = lua.create_function(|_, msg: String| {
+            log_info!("[sle] {}", msg);
+            Ok(())
+        })?;
+        sle.set("log", log_fn)?;
+
+        // `sle.print(...)` — stringify each arg, join with a tab, log.
+        let print_fn = lua.create_function(|lua, args: mlua::MultiValue| {
+            let mut parts: Vec<String> = Vec::new();
+            for value in args {
+                let part = match value {
+                    mlua::Value::Nil => "nil".to_string(),
+                    mlua::Value::Boolean(b) => b.to_string(),
+                    mlua::Value::Integer(i) => i.to_string(),
+                    mlua::Value::Number(n) => n.to_string(),
+                    mlua::Value::String(s) => s.to_string_lossy(),
+                    other => lua
+                        .coerce_string(other)?
+                        .map(|s| s.to_string_lossy())
+                        .unwrap_or_else(|| "<non-string>".to_string()),
+                };
+                parts.push(part);
+            }
+            log_info!("[sle] {}", parts.join("\t"));
+            Ok(())
+        })?;
+        sle.set("print", print_fn)?;
+
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => {
+            log_info!("bindings: sle.log / sle.print installed");
+            true
+        }
+        Err(e) => {
+            log_error!("bindings: install failed — {}", e);
+            false
+        }
+    }
 }

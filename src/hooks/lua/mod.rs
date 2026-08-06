@@ -4,11 +4,12 @@
 //!    execute arbitrary Lua inside the game VM.
 //! 2. Hooks [`update_sync`] (`Game::UpdateSync`) to capture the
 //!    `lua_State*` on the first frame and drain the script queue every
-//!    frame thereafter. On the capture frame, [`bindings`] queues a
-//!    small Lua source run by the game's own `lua_debugdostring`; it
-//!    uses the game's LuaJIT FFI to call our exported `sle_log`, so
-//!    `_G.sle.log` / `_G.sle.print` reach host [`crate::log_info!`]
-//!    without the Rust side ever touching `lua_State*`.
+//!    frame thereafter. On the capture frame, [`bindings`] installs the
+//!    `sle` namespace (`sle.log` / `sle.print`) into the game VM on the
+//!    game thread; the functions forward to host [`crate::log_info!`]
+//!    through the mlua wrapper (exact Lua 5.2.0 ABI, see `flake.nix`).
+//!    [`local_engine`] is an independent mlua VM used for host-side
+//!    script evaluation.
 //!
 //! Public helpers are re-exported flat from this module; see [`api`].
 
@@ -26,8 +27,6 @@ use crate::log_error;
 /// [`debugdostring::find`] succeeds.
 pub(super) unsafe fn install() -> bool {
     let ok = unsafe { debugdostring::find() && update_sync::install() };
-    if !ok {
-        log_error!("lua: install failed — skipping Lua hooks");
-    }
+    log_error!("lua: install failed — skipping Lua hooks");
     ok
 }

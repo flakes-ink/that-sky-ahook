@@ -2,3 +2,4 @@
 /crates/
 .direnv
 .cache
+/result

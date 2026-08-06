@@ -29,14 +29,16 @@ pub struct NetUri {
 const FORCE_HTTP: bool = true;
 
 const DOMAIN_REPLACEMENTS: &[((&str, &str), (&str, &str))] = &[
-    (
-        ("live-as-sky-merge.game.163.com", "443"),
-        ("live-as-sky-merge.game.163.com,", "443"),
-    ),
-    (
-        ("live-as-sky-merge.game.163.com,", "443"),
-        ("live-as-sky-merge.game.163.com,", "443"),
-    ),
+    // (
+    //     // origin
+    //     ("live.radiance.thatgamecompany.com", ""),
+    //     // replace
+    //     ("192.168.0.30", "8189"),
+    // ),
+    // (
+    //     ("live.radiance.thatgamecompany.com,", ""),
+    //     ("192.168.0.30", "8189"),
+    // ),
 ];
 
 /// Copy `src` into `dst`, null-terminating within bounds.
@@ -91,11 +93,14 @@ extern "C" fn hook_http_client_request(
     unsafe {
         let protocol = CStr::from_ptr((*net_uri).protocol.as_ptr() as *const libc::c_char);
         let domain = CStr::from_ptr((*net_uri).domain.as_ptr() as *const libc::c_char);
+        let port = CStr::from_ptr((*net_uri).port.as_ptr() as *const libc::c_char);
         let path = CStr::from_ptr((*net_uri).path.as_ptr() as *const libc::c_char);
+
         log_info!(
-            "[HTTP_CLIENT] URL={}://{}{}",
+            "[HTTP_CLIENT] URL={}://{}:{}{}",
             protocol.to_str().unwrap_or("?"),
             domain.to_str().unwrap_or("?"),
+            port.to_str().unwrap_or("?"),
             path.to_str().unwrap_or("?")
         );
     }
