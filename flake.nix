@@ -156,11 +156,11 @@
 
         hydraJobs = {
           x86_64-linux = {
-            default = pkgs.runCommand "that-sky-ahook-so" { } ''
+            default = pkgs.runCommand "that-sky-color-ahook-so" { } ''
               mkdir -p $out
-              cp ${packages}/lib/libthat_sky_ahook.so $out/
+              cp ${packages}/lib/libthat_sky_color_ahook.so $out/
               mkdir -p $out/nix-support
-              echo "file binary-dist $out/libthat_sky_ahook.so" > $out/nix-support/hydra-build-products
+              echo "file binary-dist $out/libthat_sky_color_ahook.so" > $out/nix-support/hydra-build-products
             '';
           };
         };
