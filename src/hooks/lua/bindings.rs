@@ -13,6 +13,7 @@
 //! LuaJIT.
 
 use crate::{log_error, log_info};
+use crate::ui;
 
 use super::update_sync;
 
@@ -51,7 +52,7 @@ pub unsafe fn register() -> bool {
 
         // `sle.log(msg)` → host-side logcat via `log_info!`.
         let log_fn = lua.create_function(|_, msg: String| {
-            log_info!("[sle] {}", msg);
+            ui::log!("[sle] {}", msg);
             Ok(())
         })?;
         sle.set("log", log_fn)?;
