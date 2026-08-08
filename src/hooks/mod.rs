@@ -7,11 +7,10 @@
 //! | [`lua`] | Lua VM integration: capture state, execute scripts |
 //! | [`shared`] | `NetUri` struct and domain-replacement helpers |
 
-pub mod shared;
-
 mod cert_verify;
 mod http_client;
 mod lua;
+// mod skylog;
 
 // Re-export public types so callers see a flat `hooks::*` namespace.
 pub use lua::{is_lua_ready, lua_exec, queue_script};
