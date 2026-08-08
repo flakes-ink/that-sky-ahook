@@ -32,11 +32,12 @@ impl EguiPainter {
 
         let ctx = egui::Context::default();
         // Touch-friendlier click detection: finger taps drift and linger more
-        // than mouse clicks, so widen both the distance and the time windows.
+        // than mouse clicks. Never let hold duration disqualify a click (a
+        // resting finger would otherwise produce a long-press, not a tap).
         ctx.memory_mut(|m| {
             let o = &mut m.options.input_options;
             o.max_click_dist = 12.0; // points (default 6.0)
-            o.max_click_duration = 1.5; // seconds (default 0.8)
+            o.max_click_duration = f64::INFINITY; // any hold still clicks
         });
 
         Self {
