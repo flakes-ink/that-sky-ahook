@@ -10,7 +10,7 @@
 mod cert_verify;
 mod http_client;
 mod lua;
-// mod skylog;
+mod skylog;
 
 // Re-export public types so callers see a flat `hooks::*` namespace.
 pub use lua::{is_lua_ready, lua_exec, queue_script};
@@ -27,6 +27,10 @@ pub fn install_all() -> usize {
     }
 
     if unsafe { http_client::install() } {
+        count += 1;
+    }
+
+    if unsafe { skylog::install() } {
         count += 1;
     }
 
