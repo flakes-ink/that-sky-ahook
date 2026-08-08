@@ -15,9 +15,9 @@ use crate::ui::android::input;
 
 /// Fixed logical UI size in points. The Surface window is always sized to
 /// `UI_SIZE * PIXELS_PER_POINT`, so egui and the Surface stay identical.
-pub const UI_WIDTH: f32 = 540.0;
-pub const UI_HEIGHT: f32 = 360.0;
-pub const PIXELS_PER_POINT: f32 = 1.5;
+pub const UI_WIDTH: f32 = 600.0;
+pub const UI_HEIGHT: f32 = 400.0;
+pub const PIXELS_PER_POINT: f32 = 1.6;
 
 /// `ui::log!("...", args)` — append a line to the on-screen Console tab.
 macro_rules! log {
