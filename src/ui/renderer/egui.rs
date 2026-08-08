@@ -30,8 +30,17 @@ impl EguiPainter {
         let renderer =
             egui_wgpu::Renderer::new(device, format, egui_wgpu::RendererOptions::default());
 
+        let ctx = egui::Context::default();
+        // Touch-friendlier click detection: finger taps drift and linger more
+        // than mouse clicks, so widen both the distance and the time windows.
+        ctx.memory_mut(|m| {
+            let o = &mut m.options.input_options;
+            o.max_click_dist = 12.0; // points (default 6.0)
+            o.max_click_duration = 1.5; // seconds (default 0.8)
+        });
+
         Self {
-            ctx: egui::Context::default(),
+            ctx,
             renderer,
             pixels_per_point: PIXELS_PER_POINT,
         }

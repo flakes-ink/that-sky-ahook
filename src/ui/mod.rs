@@ -81,6 +81,8 @@ pub fn show_overlay(ctx: &Context) {
         .default_size(screen.size())
         .show(ctx, |ui| {
             ui.set_min_size(screen.size());
+            // Larger touch targets for all interactive widgets.
+            ui.style_mut().spacing.interact_size.y = 26.0;
             frame.show(ui, |ui| {
                 let title = ui.horizontal(|ui| {
                     ui.label(RichText::new("Color Panel").strong());
@@ -167,7 +169,16 @@ fn show_tabs(ui: &mut egui::Ui) {
             (Tab::Settings, "Settings"),
             (Tab::Lua, "Lua"),
         ] {
-            if ui.selectable_label(tab == t, label).clicked() {
+            let selected = tab == t;
+            // Fixed-size targets: the default selectable label is only as tall
+            // as the text, which is too small for a finger.
+            if ui
+                .add_sized(
+                    egui::vec2(68.0, 28.0),
+                    egui::Button::selectable(selected, label),
+                )
+                .clicked()
+            {
                 tab = t;
             }
         }
