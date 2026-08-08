@@ -50,11 +50,6 @@ fn execute() {
         return;
     }
 
-    let preview: String = script
-        .chars()
-        .take(60)
-        .chain(if script.len() > 60 { Some("...") } else { None })
-        .collect();
     crate::hooks::queue_script(&script);
 }
 
