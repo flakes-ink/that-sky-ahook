@@ -1,5 +1,5 @@
 {
-  description = "Dev Shell";
+  description = "That Sky Android Hook by Color";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

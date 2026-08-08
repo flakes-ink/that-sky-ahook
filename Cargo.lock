@@ -1379,7 +1379,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "that-sky-ahook"
+name = "that-sky-color-ahook"
 version = "0.1.0"
 dependencies = [
  "color-hook",
